@@ -1,0 +1,2221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant Buddies - Spike & Jasmin</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        body { 
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #f9f3e9, #f4efe7);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            cursor: grab;
+            touch-action: none;
+        }
+        
+        body:active {
+            cursor: grabbing;
+        }
+        
+        canvas { 
+            display: block; 
+        }
+        
+        /* Status panel at the top */
+        #status-panel {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            max-width: 300px;
+            text-align: center;
+            color: #555;
+            padding: 15px;
+            background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            left: 50%;
+            transform: translateX(-50%);
+            transition: all 0.3s ease;
+        }
+        
+        /* Metrics panel at the bottom */
+        #metrics-panel {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            max-width: 300px;
+            text-align: center;
+            color: #555;
+            padding: 15px;
+            background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            left: 50%;
+            transform: translateX(-50%);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        /* Watering schedule panel */
+        #watering-schedule {
+            position: absolute;
+            width: 100%;
+            max-width: 330px;
+            color: #555;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 16px 16px 0 0;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+            left: 50%;
+            transform: translateX(-50%) translateY(100%);
+            bottom: 0;
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            z-index: 100;
+            padding-bottom: 20px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        #watering-schedule.visible {
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        .watering-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px 5px 20px;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        .watering-title {
+            font-weight: 600;
+            font-size: 18px;
+            color: #444;
+        }
+        
+        .close-button {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .close-button:before {
+            content: '×';
+            font-size: 20px;
+            color: #666;
+        }
+        
+        .calendar-container {
+            padding: 10px 20px;
+        }
+        
+        .month-header {
+            text-align: center;
+            margin: 10px 0;
+            font-weight: 600;
+            color: #444;
+        }
+        
+        .calendar {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .calendar th {
+            height: 30px;
+            text-align: center;
+            color: #888;
+            font-weight: 400;
+            font-size: 14px;
+        }
+        
+        .calendar td {
+            height: 50px;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 14px;
+            position: relative;
+            border-radius: 50%;
+        }
+        
+        .calendar-day {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+        
+        .watering-day {
+            background-color: #e1f5fe;
+            color: #0288d1;
+            font-weight: 500;
+        }
+        
+        .watering-day:before {
+            content: '';
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background-color: #0288d1;
+        }
+        
+        .today {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            font-weight: 600;
+        }
+        
+        .humidity-indicator {
+            padding: 15px 20px;
+            text-align: center;
+        }
+        
+        .humidity-meter {
+            height: 6px;
+            width: 100%;
+            background-color: #f0f0f0;
+            border-radius: 3px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        
+        .humidity-level {
+            height: 100%;
+            width: 65%;
+            background: linear-gradient(to right, #81d4fa, #29b6f6);
+            border-radius: 3px;
+        }
+        
+        .next-watering {
+            text-align: center;
+            padding: 15px 20px;
+            border-top: 1px solid rgba(0,0,0,0.05);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            margin-bottom: 10px;
+        }
+        
+        .watering-recommendation {
+            font-weight: 500;
+            color: #0288d1;
+            margin: 8px 0;
+        }
+        
+        .swipe-indicator {
+            text-align: center;
+            padding: 10px;
+            color: #999;
+            font-size: 12px;
+        }
+        
+        .swipe-indicator::before {
+            content: '⌄⌄';
+            display: block;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        .plant-name {
+            font-weight: 600;
+            font-size: 18px;
+            margin-bottom: 5px;
+            color: #444;
+        }
+        
+        .plant-stats {
+            display: flex;
+            justify-content: space-around;
+            font-size: 14px;
+            color: #666;
+            margin-top: 8px;
+        }
+        
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            font-size: 16px;
+            color: #444;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+        }
+        
+        .happiness-meter {
+            height: 12px;
+            width: 90%;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 12px auto;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .happiness-level {
+            height: 100%;
+            width: 65%;
+            background: linear-gradient(to right, #70c8ff, #3c9edb);
+            border-radius: 10px;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .metrics-title {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .meter-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #888;
+            margin: 4px 5% 0 5%;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .metric-box {
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
+            padding: 8px;
+        }
+        
+        .metric-title {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 4px;
+        }
+        
+        .metric-value {
+            font-weight: 600;
+            font-size: 14px;
+            color: #444;
+        }
+        
+        /* Swipe indicators */
+        .swipe-indicators {
+            position: absolute;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            bottom: 150px;
+            pointer-events: none;
+        }
+        
+        .swipe-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: rgba(100, 100, 100, 0.3);
+            margin: 0 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .swipe-dot.active {
+            background-color: rgba(100, 100, 100, 0.8);
+            transform: scale(1.3);
+        }
+        
+        .swipe-arrow {
+            position: absolute;
+            top: 50%;
+            width: 50px;
+            height: 50px;
+            background-color: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transform: translateY(-50%);
+            opacity: 0.7;
+            transition: opacity 0.3s ease;
+            z-index: 10;
+        }
+        
+        .swipe-arrow:hover {
+            opacity: 1;
+        }
+        
+        .swipe-left {
+            left: 20px;
+        }
+        
+        .swipe-right {
+            right: 20px;
+        }
+        
+        .swipe-arrow::before {
+            content: '';
+            width: 15px;
+            height: 15px;
+            border-top: 3px solid #666;
+            border-right: 3px solid #666;
+            display: block;
+        }
+        
+        .swipe-left::before {
+            transform: rotate(-135deg);
+            margin-left: 5px;
+        }
+        
+        .swipe-right::before {
+            transform: rotate(45deg);
+            margin-right: 5px;
+        }
+        
+        /* Speech bubble */
+        .speech-bubble {
+            position: absolute;
+            top: 25%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border-radius: 20px;
+            padding: 12px 18px;
+            max-width: 220px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            font-size: 16px;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+            z-index: 100;
+            text-align: center;
+        }
+        
+        .speech-bubble:after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid white;
+        }
+        
+        .speech-bubble.active {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-10px);
+        }
+        
+        /* Lightbulb styling */
+        .lightbulb-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            z-index: 100;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .lightbulb-container:hover {
+            transform: scale(1.1);
+        }
+        
+        .lightbulb {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+        
+        .lightbulb.active .bulb {
+            background-color: #FFEB3B;
+            box-shadow: 0 0 15px rgba(255, 235, 59, 0.8);
+        }
+        
+        .bulb {
+            width: 24px;
+            height: 24px;
+            background-color: #f5f5f5;
+            border-radius: 50% 50% 10% 10%;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .filament-left, .filament-right {
+            width: 2px;
+            height: 10px;
+            background-color: #DDD;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .filament-left {
+            left: 8px;
+            transform: translateY(-50%) rotate(-20deg);
+        }
+        
+        .filament-right {
+            right: 8px;
+            transform: translateY(-50%) rotate(20deg);
+        }
+        
+        .bulb-base {
+            width: 15px;
+            height: 8px;
+            background-color: #CCC;
+            border-radius: 2px;
+            margin-top: -2px;
+        }
+        
+        /* Tips bubble styling */
+        .tips-bubble {
+            position: absolute;
+            top: 20px;
+            right: 70px;
+            width: 280px;
+            background-color: white;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            opacity: 0;
+            transform: translateX(20px);
+            transition: all 0.3s ease;
+            z-index: 90;
+            display: none;
+        }
+        
+        .tips-bubble.active {
+            opacity: 1;
+            transform: translateX(0);
+            display: block;
+        }
+        
+        /* Arrow pointing from tips bubble to lightbulb */
+        .tips-bubble:after {
+            content: '';
+            position: absolute;
+            top: 15px;
+            right: -10px;
+            width: 0;
+            height: 0;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
+            border-left: 10px solid white;
+        }
+        
+        .tip-title {
+            font-weight: 600;
+            font-size: 16px;
+            color: #444;
+            margin-bottom: 10px;
+        }
+        
+        .tip-content {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 5px;
+        }
+        
+        /* Graph icon styling */
+        .graph-icon-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            z-index: 100;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .graph-icon-container:hover {
+            transform: scale(1.1);
+        }
+        
+        .graph-icon {
+            width: 24px;
+            height: 24px;
+        }
+        
+        /* Graph panel styling */
+        .graph-panel {
+            position: absolute;
+            top: 80px;
+            left: 0;
+            width: 0;
+            height: calc(100% - 160px);
+            background-color: white;
+            border-radius: 0 15px 15px 0;
+            box-shadow: 2px 0 15px rgba(0, 0, 0, 0.1);
+            transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            overflow: hidden;
+            z-index: 95;
+        }
+        
+        .graph-panel.visible {
+            width: 500px;
+        }
+        
+        .graph-content {
+            padding: 20px;
+            width: 480px;
+            height: 100%;
+            overflow-y: auto;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            transition-delay: 0.2s;
+        }
+        
+        .graph-panel.visible .graph-content {
+            opacity: 1;
+        }
+        
+        .graph-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .graph-title {
+            font-weight: 600;
+            font-size: 18px;
+            color: #444;
+        }
+        
+        .graph-close {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .graph-close:before {
+            content: '×';
+            font-size: 20px;
+            color: #666;
+        }
+        
+        .graph-container {
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            padding: 15px;
+        }
+        
+        /* Tabs for different graphs */
+        .graph-tabs {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+        
+        .graph-tab {
+            padding: 8px 15px;
+            cursor: pointer;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        
+        .graph-tab.active {
+            color: #4285f4;
+            border-bottom-color: #4285f4;
+            font-weight: 500;
+        }
+        
+        .graph-tab:hover {
+            background-color: rgba(0, 0, 0, 0.03);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="status-panel">
+        <div class="plant-name" id="plant-name">Spike the Cactus</div>
+        <div class="plant-stats" id="plant-stats">
+            <div class="stat-item">
+                <div class="stat-value" id="stat-age">3</div>
+                <div class="stat-label">Months</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-height">15</div>
+                <div class="stat-label">cm</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-mood">Happy</div>
+                <div class="stat-label">Mood</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="stat-level">3</div>
+                <div class="stat-label">Level</div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="metrics-panel">
+        <div class="metrics-title" id="metrics-title">Happiness Level</div>
+        <div class="happiness-meter">
+            <div class="happiness-level" id="happiness-level"></div>
+        </div>
+        <div class="meter-label">
+            <span>Low</span>
+            <span>Average</span>
+            <span>High</span>
+        </div>
+        
+        <div class="metrics-grid" id="metrics-grid">
+            <div class="metric-box">
+                <div class="metric-title">Sunlight</div>
+                <div class="metric-value" id="metric-sunlight">6.5 hrs/day</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-title">Water</div>
+                <div class="metric-value" id="metric-water">Optimal</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-title">Growth</div>
+                <div class="metric-value" id="metric-growth">+2.1 cm</div>
+            </div>
+            <div class="metric-box">
+                <div class="metric-title" id="special-metric-title">Health</div>
+                <div class="metric-value" id="special-metric-value">Excellent</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="swipe-indicators">
+        <div class="swipe-dot active" data-index="0"></div>
+        <div class="swipe-dot" data-index="1"></div>
+        <div class="swipe-dot" data-index="2"></div>
+        <div class="swipe-dot" data-index="3"></div>
+    </div>
+    
+    <div class="swipe-arrow swipe-left" id="prev-btn"></div>
+    <div class="swipe-arrow swipe-right" id="next-btn"></div>
+    
+    <div class="speech-bubble" id="speech-bubble"></div>
+    
+    <!-- Lightbulb in top right corner -->
+    <div class="lightbulb-container" id="lightbulb">
+        <div class="lightbulb">
+            <div class="bulb">
+                <div class="filament-left"></div>
+                <div class="filament-right"></div>
+            </div>
+            <div class="bulb-base"></div>
+        </div>
+    </div>
+    
+    <!-- Tips bubble that appears next to lightbulb -->
+    <div class="tips-bubble" id="tips-bubble">
+        <div class="tip-title" id="tip-title">Cactus Care Tip</div>
+        <div class="tip-content" id="tip-content">Cacti need at least 4-6 hours of direct sunlight daily to thrive. Place your cactus in a south or east-facing window for optimal growth.</div>
+    </div>
+    
+    <!-- Graph icon in top left corner -->
+    <div class="graph-icon-container" id="graph-icon">
+        <svg class="graph-icon" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+    </div>
+    
+    <!-- Graph panel that slides from left -->
+    <div class="graph-panel" id="graph-panel">
+        <div class="graph-content">
+            <div class="graph-header">
+                <div class="graph-title" id="graph-title">Plant Monitoring Data</div>
+                <div class="graph-close" id="graph-close"></div>
+            </div>
+            
+            <div class="graph-tabs">
+                <div class="graph-tab active" data-tab="moisture">Moisture</div>
+                <div class="graph-tab" data-tab="light">Light</div>
+                <div class="graph-tab" data-tab="combined">Combined</div>
+            </div>
+            
+            <div class="tab-content active" id="moisture-tab">
+                <div class="graph-container">
+                    <canvas id="moisture-chart"></canvas>
+                </div>
+                <div class="graph-info">
+                    <p>Soil moisture levels over the past 7 days. The optimal range for this plant is indicated by the green zone.</p>
+                    <p><strong>Last Watering:</strong> <span id="last-watering">Yesterday, 9:15 AM</span></p>
+                    <p><strong>Average Moisture:</strong> <span id="avg-moisture">68%</span></p>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="light-tab">
+                <div class="graph-container">
+                    <canvas id="light-chart"></canvas>
+                </div>
+                <div class="graph-info">
+                    <p>Light exposure (in lux) over the past 7 days. The optimal light range for this plant is indicated by the yellow zone.</p>
+                    <p><strong>Daily Average:</strong> <span id="avg-light">5.8 hrs/day</span></p>
+                    <p><strong>Light Quality:</strong> <span id="light-quality">Good</span></p>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="combined-tab">
+                <div class="graph-container">
+                    <canvas id="combined-chart"></canvas>
+                </div>
+                <div class="graph-info">
+                    <p>Combined view of moisture levels and light exposure over time.</p>
+                    <p>This visualization helps identify patterns and correlations between watering, moisture levels, and light exposure.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="watering-schedule">
+        <div class="watering-header">
+            <div class="watering-title" id="watering-title">Watering Schedule</div>
+            <div class="close-button" id="close-schedule"></div>
+        </div>
+        
+        <div class="humidity-indicator">
+            <div>Current Soil Moisture</div>
+            <div class="humidity-meter">
+                <div class="humidity-level" id="humidity-level"></div>
+            </div>
+            <div id="humidity-status">Optimal (65%)</div>
+        </div>
+        
+        <div class="next-watering">
+            <div>Based on current moisture level:</div>
+            <div class="watering-recommendation" id="watering-recommendation">Water in 3 days</div>
+        </div>
+        
+        <div class="calendar-container">
+            <div class="month-header" id="month-header">March 2025</div>
+            <table class="calendar" id="calendar">
+                <thead>
+                    <tr>
+                        <th>Su</th>
+                        <th>Mo</th>
+                        <th>Tu</th>
+                        <th>We</th>
+                        <th>Th</th>
+                        <th>Fr</th>
+                        <th>Sa</th>
+                    </tr>
+                </thead>
+                <tbody id="calendar-body">
+                    <!-- Calendar will be generated with JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="swipe-indicator">
+            Swipe up to close
+        </div>
+    </div>
+    
+    <script>
+        // Plant character data
+        const characters = [
+            {
+                name: "Spike the Cactus",
+                age: 3,
+                height: 15,
+                mood: "Happy",
+                level: 3,
+                sunlight: "6.5 hrs/day",
+                water: "Optimal",
+                growth: "+2.1 cm",
+                specialMetric: {
+                    title: "Health",
+                    value: "Excellent"
+                },
+                happiness: 65,
+                // Character dialogue options
+                dialogue: {
+                    greetings: [
+                        "Hey there!",
+                        "Hi friend!",
+                        "What's poppin'?",
+                        "Howdy partner!",
+                        "Sup dude!"
+                    ],
+                    quickResponses: [
+                        "I'm here!",
+                        "Perfect day for some sun!",
+                        "Need water? Nah, I'm good!"
+                    ],
+                    personalityLines: [
+                        "Desert life made me tough but lovable!",
+                        "I may be prickly, but I've got a soft heart!"
+                    ],
+                    tickleResponses: [
+                        "Hehe, that tickles!",
+                        "Watch the spines, I'm ticklish!"
+                    ],
+                    // Added new dialogue lines
+                    additionalLines: [
+                        "I can go weeks without water, I'm just built different!",
+                        "Sun's out, spines out!",
+                        "Being tough is my specialty!",
+                        "Life in the desert taught me patience.",
+                        "I'm literally the coolest plant in the room!",
+                        "Did you know my spines are modified leaves? Evolution is wild!"
+                    ]
+                },
+                // Care tips for the lightbulb feature
+                careTips: [
+                    {
+                        title: "Sunlight Tip",
+                        content: "Cacti need at least 4-6 hours of direct sunlight daily to thrive. Place your cactus in a south or east-facing window for optimal growth."
+                    },
+                    {
+                        title: "Watering Wisdom",
+                        content: "Only water your cactus when the soil is completely dry. In winter, reduce watering to once a month. Overwatering is the number one killer of cacti!"
+                    },
+                    {
+                        title: "Soil Matters",
+                        content: "Cacti require well-draining soil. Use a specialized cactus mix or add perlite and sand to regular potting soil to create the perfect growing medium."
+                    }
+                ]
+            },
+            {
+                name: "Jasmin the Flower",
+                age: 2,
+                height: 5,
+                mood: "Cheerful",
+                level: 2,
+                sunlight: "5.2 hrs/day",
+                water: "Moist",
+                growth: "+1.8 cm",
+                specialMetric: {
+                    title: "Fragrance",
+                    value: "Exquisite"
+                },
+                happiness: 78,
+                // Character dialogue options
+                dialogue: {
+                    greetings: [
+                        "Hello, darling!",
+                        "*Wafts pleasant scent* Hi!",
+                        "Greetings from Damascus!"
+                    ],
+                    quickResponses: [
+                        "I'm feeling fragrant today!",
+                        "Isn't the breeze lovely?",
+                        "My petals feel so refreshed!"
+                    ],
+                    personalityLines: [
+                        "My fragrance is from the gardens of Damascus!",
+                        "I may be small, but my scent is mighty!"
+                    ],
+                    tickleResponses: [
+                        "Oh my! That makes my petals flutter!",
+                        "Teehee! You're making me blush!"
+                    ],
+                    // Added new dialogue lines
+                    additionalLines: [
+                        "I'm feeling particularly fragrant this morning!",
+                        "The secret to my scent is a bit of morning dew.",
+                        "Did you know jasmine symbolizes purity and grace?",
+                        "I bloom best when I'm admired regularly!",
+                        "My perfume has inspired poets for centuries!",
+                        "A gentle mist makes me so happy!"
+                    ]
+                },
+                // Care tips for the lightbulb feature
+                careTips: [
+                    {
+                        title: "Jasmine Light Requirements",
+                        content: "Jasmine flowers need bright, indirect light. They require at least 4 hours of sunlight daily, but protect them from harsh afternoon sun which can burn their delicate petals."
+                    },
+                    {
+                        title: "Proper Watering",
+                        content: "Keep soil consistently moist but not soggy. Water thoroughly when the top inch of soil feels dry. Jasmine plants need more water during blooming periods and less in winter."
+                    },
+                    {
+                        title: "Humidity Needs",
+                        content: "Damascus jasmine thrives in moderate to high humidity. Mist the foliage regularly or place on a pebble tray with water to increase humidity around the plant."
+                    }
+                ]
+            },
+            {
+                name: "Fernie the Maidenhair",
+                age: 1,
+                height: 8,
+                mood: "Shy",
+                level: 1,
+                sunlight: "3.5 hrs/day",
+                water: "Very Moist",
+                growth: "+3.2 cm",
+                specialMetric: {
+                    title: "Elegance",
+                    value: "Graceful"
+                },
+                happiness: 82,
+                // Character dialogue options
+                dialogue: {
+                    greetings: [
+                        "Oh! Hello there...",
+                        "Nice to meet you!",
+                        "*gentle wave* Hi..."
+                    ],
+                    quickResponses: [
+                        "Is it humid enough in here?",
+                        "I love misty mornings!",
+                        "The indirect light is perfect today!"
+                    ],
+                    personalityLines: [
+                        "I may be delicate, but I'm resilient in the right conditions!",
+                        "My fronds are like little dancers in the breeze!"
+                    ],
+                    tickleResponses: [
+                        "*shivers delicately* That's so ticklish!",
+                        "Oh my! My fronds are sensitive!"
+                    ],
+                    // Added new dialogue lines
+                    additionalLines: [
+                        "*whispers* Thank you for the attention...",
+                        "I'm feeling a bit bashful today...",
+                        "My ancestors grew in ancient forests long ago.",
+                        "I like to sway gently when no one's watching.",
+                        "Please mist me a little more? If that's okay...",
+                        "I've been called the ballet dancer of plants... *blushes*"
+                    ]
+                },
+                // Care tips for the lightbulb feature
+                careTips: [
+                    {
+                        title: "Humidity Is Key",
+                        content: "Maidenhair ferns need high humidity to thrive. Mist daily, use a humidifier, or place on a pebble tray with water. Bathrooms with windows make excellent homes for these moisture-loving plants."
+                    },
+                    {
+                        title: "Water Wisdom",
+                        content: "Keep soil consistently moist but not waterlogged. Never let a maidenhair fern dry out completely - they're very sensitive to drought and may not recover if they wilt severely."
+                    },
+                    {
+                        title: "Light Requirements",
+                        content: "Maidenhair ferns prefer bright, indirect light and will scorch in direct sunlight. A north or east-facing window is ideal. They can also thrive under fluorescent lights."
+                    }
+                ]
+            },
+            {
+                name: "Snakey the Snake Plant",
+                age: 5,
+                height: 25,
+                mood: "Wise",
+                level: 4,
+                sunlight: "4.0 hrs/day",
+                water: "Minimal",
+                growth: "+0.8 cm",
+                specialMetric: {
+                    title: "Resilience",
+                    value: "Unmatched"
+                },
+                happiness: 70,
+                // Character dialogue options
+                dialogue: {
+                    greetings: [
+                        "Greetings, young one.",
+                        "Ah, a visitor. Welcome.",
+                        "Stand tall, like me!"
+                    ],
+                    quickResponses: [
+                        "I've survived much worse than this!",
+                        "Did you know I can go weeks without water?",
+                        "The air is cleaner when I'm around!"
+                    ],
+                    personalityLines: [
+                        "I've been filtering air since before it was trendy!",
+                        "They call me Mother-in-Law's Tongue because I'm sharp and enduring!"
+                    ],
+                    tickleResponses: [
+                        "*barely moves* Was that supposed to tickle?",
+                        "My leaves are too dignified for tickling!"
+                    ],
+                    // Added new dialogue lines
+                    additionalLines: [
+                        "I have witnessed many plants come and go in my time.",
+                        "Patience, young gardener. Good things come to those who wait.",
+                        "I purify the air while you sleep. You're welcome.",
+                        "A sturdy pot and neglect - that's my secret to longevity.",
+                        "In my five years, I've learned that less care is often more.",
+                        "The ancient wisdom of plants is in my DNA."
+                    ]
+                },
+                // Care tips for the lightbulb feature
+                careTips: [
+                    {
+                        title: "Nearly Indestructible",
+                        content: "Snake plants are incredibly forgiving and can tolerate neglect. They thrive in almost any light condition from low light to bright indirect light, making them perfect for beginners."
+                    },
+                    {
+                        title: "Watering Tips",
+                        content: "Allow soil to dry completely between waterings. In winter, water only once a month. Overwatering is the main way to kill a snake plant - they're prone to root rot if kept too wet."
+                    },
+                    {
+                        title: "Air Purification",
+                        content: "Snake plants are excellent air purifiers, removing toxins like formaldehyde and benzene. They also release oxygen at night, unlike most plants, making them ideal bedroom companions."
+                    }
+                ]
+            }
+        ];
+        
+        // Setup renderer
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            alpha: true,
+            powerPreference: 'high-performance'
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
+        renderer.setPixelRatio(window.devicePixelRatio > 1 ? 2 : 1);
+        document.body.appendChild(renderer.domElement);
+
+        // Setup scene and camera
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 4.5;
+        camera.position.y = 0;
+
+        // Lighting setup (simplified for performance)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        mainLight.position.set(5, 10, 7);
+        scene.add(mainLight);
+
+        // Create groups for each character
+        const characterGroups = [];
+        
+        // Current character index
+        let currentCharIndex = 0;
+        
+        // Create simplified cactus character
+        function createCactusCharacter() {
+            const cactusGroup = new THREE.Group();
+            
+            // Create pot
+            const potGeometry = new THREE.CylinderGeometry(0.9, 0.7, 0.8, 16);
+            const potMaterial = new THREE.MeshPhongMaterial({ color: 0xe08b67 });
+            const pot = new THREE.Mesh(potGeometry, potMaterial);
+            pot.position.y = -1.3;
+            cactusGroup.add(pot);
+            
+            // Soil
+            const soilGeometry = new THREE.CylinderGeometry(0.85, 0.85, 0.08, 16);
+            const soilMaterial = new THREE.MeshPhongMaterial({ color: 0x603a20 });
+            const soil = new THREE.Mesh(soilGeometry, soilMaterial);
+            soil.position.y = -0.72;
+            cactusGroup.add(soil);
+            
+            // Create simplified cactus body
+            const bodyGeometry = new THREE.CylinderGeometry(0.5, 0.6, 1.6, 16);
+            const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x2d8a5d });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.1;
+            cactusGroup.add(body);
+            
+            // Add top dome
+            const domeGeometry = new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+            const dome = new THREE.Mesh(domeGeometry, bodyMaterial);
+            dome.position.y = 0.9;
+            cactusGroup.add(dome);
+            
+            // Add simplified spikes as a detail material
+            const spikesGeometry = new THREE.SphereGeometry(0.52, 16, 16);
+            const spikesMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x2d8a5d,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.5
+            });
+            const spikes = new THREE.Mesh(spikesGeometry, spikesMaterial);
+            spikes.position.y = 0.1;
+            cactusGroup.add(spikes);
+            
+            // Create the face
+            // Eyes
+            const eyeGeometry = new THREE.SphereGeometry(0.08, 8, 8);
+            const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
+            
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(-0.2, 0.4, 0.45);
+            cactusGroup.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(0.2, 0.4, 0.45);
+            cactusGroup.add(rightEye);
+            
+            // Smile
+            const smileGeometry = new THREE.TorusGeometry(0.15, 0.03, 8, 8, Math.PI);
+            const smileMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            const smile = new THREE.Mesh(smileGeometry, smileMaterial);
+            smile.position.set(0, 0.2, 0.45);
+            smile.rotation.x = Math.PI/2;
+            smile.rotation.y = Math.PI;
+            cactusGroup.add(smile);
+            
+            // Position and scale
+            cactusGroup.scale.set(0.8, 0.8, 0.8);
+            cactusGroup.position.y = 0;
+            cactusGroup.rotation.y = -0.3;
+            
+            return cactusGroup;
+        }
+        
+        // Create simplified jasmin character
+        function createJasminCharacter() {
+            const jasminGroup = new THREE.Group();
+            
+            // Create pot
+            const potGeometry = new THREE.CylinderGeometry(0.8, 0.6, 0.8, 16);
+            const potMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+            const pot = new THREE.Mesh(potGeometry, potMaterial);
+            pot.position.y = -1.0;
+            jasminGroup.add(pot);
+            
+            // Soil
+            const soilGeometry = new THREE.CylinderGeometry(0.75, 0.75, 0.1, 16);
+            const soilMaterial = new THREE.MeshPhongMaterial({ color: 0x3D2817 });
+            const soil = new THREE.Mesh(soilGeometry, soilMaterial);
+            soil.position.y = -0.55;
+            jasminGroup.add(soil);
+            
+            // Create simplified stem
+            const stemGeometry = new THREE.CylinderGeometry(0.03, 0.04, 1.2, 8);
+            const stemMaterial = new THREE.MeshPhongMaterial({ color: 0x558844 });
+            const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+            stem.position.y = 0.05;
+            jasminGroup.add(stem);
+            
+            // Create simple flower using particles
+            const flowerGroup = new THREE.Group();
+            flowerGroup.position.set(0, 0.65, 0);
+            
+            // Central sphere
+            const centerGeometry = new THREE.SphereGeometry(0.08, 8, 8);
+            const centerMaterial = new THREE.MeshPhongMaterial({ color: 0xFFF0A0 });
+            const center = new THREE.Mesh(centerGeometry, centerMaterial);
+            flowerGroup.add(center);
+            
+            // Petals using simpler shapes
+            const petalCount = 5;
+            const petalGeometry = new THREE.SphereGeometry(0.1, 8, 4);
+            const petalMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFFFF });
+            
+            for (let i = 0; i < petalCount; i++) {
+                const angle = (i / petalCount) * Math.PI * 2;
+                const distance = 0.12;
+                
+                const petal = new THREE.Mesh(petalGeometry, petalMaterial);
+                petal.position.x = Math.cos(angle) * distance;
+                petal.position.z = Math.sin(angle) * distance;
+                petal.scale.set(1, 0.5, 1);
+                petal.lookAt(0, 0, 0);
+                flowerGroup.add(petal);
+            }
+            
+            jasminGroup.add(flowerGroup);
+            
+            // Create the face
+            // Eyes
+            const eyeGeometry = new THREE.SphereGeometry(0.07, 8, 8);
+            const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
+            
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(-0.12, 0.15, 0.2);
+            jasminGroup.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(0.12, 0.15, 0.2);
+            jasminGroup.add(rightEye);
+            
+            // Smile
+            const smileGeometry = new THREE.TorusGeometry(0.1, 0.02, 8, 8, Math.PI);
+            const smileMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            const smile = new THREE.Mesh(smileGeometry, smileMaterial);
+            smile.position.set(0, 0, 0.2);
+            smile.rotation.x = Math.PI/2;
+            smile.rotation.y = Math.PI;
+            jasminGroup.add(smile);
+            
+            // Position and scale
+            jasminGroup.scale.set(0.9, 0.9, 0.9);
+            jasminGroup.position.y = -0.3;
+            jasminGroup.rotation.y = 0.2;
+            
+            return jasminGroup;
+        }
+        
+        // Create Maidenhair Fern character
+        function createFernCharacter() {
+            const fernGroup = new THREE.Group();
+            
+            // Create pot - white ceramic
+            const potGeometry = new THREE.CylinderGeometry(0.7, 0.5, 0.9, 16);
+            const potMaterial = new THREE.MeshPhongMaterial({ color: 0xEEEEEE });
+            const pot = new THREE.Mesh(potGeometry, potMaterial);
+            pot.position.y = -1.0;
+            fernGroup.add(pot);
+            
+            // Soil
+            const soilGeometry = new THREE.CylinderGeometry(0.65, 0.65, 0.1, 16);
+            const soilMaterial = new THREE.MeshPhongMaterial({ color: 0x3D2817 });
+            const soil = new THREE.Mesh(soilGeometry, soilMaterial);
+            soil.position.y = -0.5;
+            fernGroup.add(soil);
+            
+            // Create fern base stem
+            const stemGeometry = new THREE.CylinderGeometry(0.05, 0.06, 0.3, 8);
+            const stemMaterial = new THREE.MeshPhongMaterial({ color: 0x7D5A4F });
+            const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+            stem.position.y = -0.3;
+            fernGroup.add(stem);
+            
+            // Create multiple fern fronds
+            const frondCount = 12;
+            const frondGroup = new THREE.Group();
+            frondGroup.position.y = -0.15;
+            
+            for (let i = 0; i < frondCount; i++) {
+                const angle = (i / frondCount) * Math.PI * 2;
+                const radius = 0.6;
+                const height = 0.5 + Math.random() * 0.3;
+                
+                // Create main frond stem
+                const frondStemGeo = new THREE.CylinderGeometry(0.01, 0.02, height, 4);
+                const frondStemMat = new THREE.MeshPhongMaterial({ color: 0x3B7D4F });
+                const frondStem = new THREE.Mesh(frondStemGeo, frondStemMat);
+                
+                // Position and rotate each frond
+                frondStem.position.x = Math.cos(angle) * (radius * 0.2);
+                frondStem.position.z = Math.sin(angle) * (radius * 0.2);
+                frondStem.position.y = height / 2;
+                
+                // Bend outward
+                frondStem.rotation.x = Math.PI/6 + Math.random() * Math.PI/6;
+                frondStem.rotation.y = angle;
+                
+                // Add leaflets along stem
+                const leafCount = 5;
+                for (let j = 0; j < leafCount; j++) {
+                    const leafPos = j / leafCount;
+                    
+                    // Create leaf shape
+                    const leafGeo = new THREE.SphereGeometry(0.08, 6, 3);
+                    const leafMat = new THREE.MeshPhongMaterial({ color: 0x65AF7D });
+                    const leaf = new THREE.Mesh(leafGeo, leafMat);
+                    
+                    // Position leaf along stem
+                    leaf.position.y = height * (0.3 + leafPos * 0.6);
+                    leaf.scale.set(1.5, 0.15, 1.5);
+                    
+                    // Rotate leaf
+                    leaf.rotation.x = Math.PI/2;
+                    
+                    frondStem.add(leaf);
+                }
+                
+                frondGroup.add(frondStem);
+            }
+            
+            fernGroup.add(frondGroup);
+            
+            // Create the face
+            // Eyes - slightly higher
+            const eyeGeometry = new THREE.SphereGeometry(0.06, 8, 8);
+            const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
+            
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(-0.15, 0.1, 0.25);
+            fernGroup.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(0.15, 0.1, 0.25);
+            fernGroup.add(rightEye);
+            
+            // White highlights
+            const highlightGeometry = new THREE.SphereGeometry(0.02, 6, 6);
+            const highlightMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFFFF });
+            
+            const leftHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+            leftHighlight.position.set(-0.13, 0.12, 0.3);
+            fernGroup.add(leftHighlight);
+            
+            const rightHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+            rightHighlight.position.set(0.17, 0.12, 0.3);
+            fernGroup.add(rightHighlight);
+            
+            // Small shy smile
+            const smileGeometry = new THREE.TorusGeometry(0.08, 0.015, 8, 8, Math.PI);
+            const smileMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            const smile = new THREE.Mesh(smileGeometry, smileMaterial);
+            smile.position.set(0, -0.05, 0.25);
+            smile.rotation.x = Math.PI/2;
+            smile.rotation.y = Math.PI;
+            fernGroup.add(smile);
+            
+            // Position and scale
+            fernGroup.scale.set(0.85, 0.85, 0.85);
+            fernGroup.position.y = -0.3;
+            fernGroup.rotation.y = 0.2;
+            
+            return fernGroup;
+        }
+        
+        // Create Snake Plant character
+        function createSnakePlantCharacter() {
+            const snakePlantGroup = new THREE.Group();
+            
+            // Create pot - terracotta
+            const potGeometry = new THREE.CylinderGeometry(0.7, 0.5, 0.7, 16);
+            const potMaterial = new THREE.MeshPhongMaterial({ color: 0xC67D4C });
+            const pot = new THREE.Mesh(potGeometry, potMaterial);
+            pot.position.y = -1.0;
+            snakePlantGroup.add(pot);
+            
+            // Soil
+            const soilGeometry = new THREE.CylinderGeometry(0.65, 0.65, 0.1, 16);
+            const soilMaterial = new THREE.MeshPhongMaterial({ color: 0x3D2817 });
+            const soil = new THREE.Mesh(soilGeometry, soilMaterial);
+            soil.position.y = -0.6;
+            snakePlantGroup.add(soil);
+            
+            // Create snake plant leaves
+            const leafCount = 7;
+            
+            for (let i = 0; i < leafCount; i++) {
+                const angle = (i / leafCount) * Math.PI * 2;
+                const radius = 0.2;
+                
+                // Vary heights
+                const height = 1.2 + (Math.random() * 0.7);
+                
+                // Create leaf shape
+                const leafCurve = new THREE.CubicBezierCurve3(
+                    new THREE.Vector3(0, 0, 0),
+                    new THREE.Vector3(0, height * 0.3, 0.1),
+                    new THREE.Vector3(0, height * 0.7, 0.2),
+                    new THREE.Vector3(0, height, 0)
+                );
+                
+                const leafGeometry = new THREE.TubeGeometry(leafCurve, 8, 0.07, 8, false);
+                
+                // Alternating color bands
+                const leafMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0x437D40, 
+                    flatShading: true
+                });
+                
+                const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+                
+                // Position and rotate leaves
+                leaf.position.set(
+                    Math.cos(angle) * radius,
+                    -0.5,
+                    Math.sin(angle) * radius
+                );
+                
+                // Random slight tilt
+                leaf.rotation.x = (Math.random() * 0.1) - 0.05;
+                leaf.rotation.z = (Math.random() * 0.2) - 0.1;
+                leaf.rotation.y = angle + ((Math.random() * 0.2) - 0.1);
+                
+                // Add yellow edges - simplified as stripes
+                const stripeGeometry = new THREE.BoxGeometry(0.01, height * 0.8, 0.18);
+                const stripeMaterial = new THREE.MeshPhongMaterial({ color: 0xD4D86A });
+                const stripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
+                stripe.position.y = height * 0.4;
+                stripe.position.z = 0.08;
+                leaf.add(stripe);
+                
+                snakePlantGroup.add(leaf);
+            }
+            
+            // Create the face - slightly higher due to tall plant
+            // Eyes
+            const eyeGeometry = new THREE.SphereGeometry(0.07, 8, 8);
+            const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
+            
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(-0.15, 0.0, 0.35);
+            snakePlantGroup.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(0.15, 0.0, 0.35);
+            snakePlantGroup.add(rightEye);
+            
+            // White highlights
+            const highlightGeometry = new THREE.SphereGeometry(0.025, 6, 6);
+            const highlightMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFFFF });
+            
+            const leftHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+            leftHighlight.position.set(-0.13, 0.03, 0.4);
+            snakePlantGroup.add(leftHighlight);
+            
+            const rightHighlight = new THREE.Mesh(highlightGeometry, highlightMaterial);
+            rightHighlight.position.set(0.17, 0.03, 0.4);
+            snakePlantGroup.add(rightHighlight);
+            
+            // Stern mouth - straight line
+            const mouthGeometry = new THREE.BoxGeometry(0.2, 0.015, 0.015);
+            const mouthMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+            mouth.position.set(0, -0.15, 0.35);
+            snakePlantGroup.add(mouth);
+            
+            // Position and scale
+            snakePlantGroup.scale.set(0.8, 0.8, 0.8);
+            snakePlantGroup.position.y = -0.2; // Slightly higher due to taller plant
+            snakePlantGroup.rotation.y = 0.2;
+            
+            return snakePlantGroup;
+        }
+        
+        // Initialize characters
+        function initCharacters() {
+            // Create cactus
+            const cactusCharacter = createCactusCharacter();
+            characterGroups.push(cactusCharacter);
+            scene.add(cactusCharacter);
+            
+            // Create jasmin
+            const jasminCharacter = createJasminCharacter();
+            characterGroups.push(jasminCharacter);
+            scene.add(jasminCharacter);
+            
+            // Create fern
+            const fernCharacter = createFernCharacter();
+            characterGroups.push(fernCharacter);
+            scene.add(fernCharacter);
+            
+            // Create snake plant
+            const snakePlantCharacter = createSnakePlantCharacter();
+            characterGroups.push(snakePlantCharacter);
+            scene.add(snakePlantCharacter);
+            
+            // Hide all except first
+            for (let i = 1; i < characterGroups.length; i++) {
+                characterGroups[i].visible = false;
+            }
+        }
+        
+        // Update UI based on current character
+        function updateUI(index) {
+            const character = characters[index];
+            
+            // Update text elements
+            document.getElementById('plant-name').textContent = character.name;
+            document.getElementById('stat-age').textContent = character.age;
+            document.getElementById('stat-height').textContent = character.height;
+            document.getElementById('stat-mood').textContent = character.mood;
+            document.getElementById('stat-level').textContent = character.level;
+            
+            document.getElementById('metric-sunlight').textContent = character.sunlight;
+            document.getElementById('metric-water').textContent = character.water;
+            document.getElementById('metric-growth').textContent = character.growth;
+            document.getElementById('special-metric-title').textContent = character.specialMetric.title;
+            document.getElementById('special-metric-value').textContent = character.specialMetric.value;
+            
+            // Update happiness level
+            const happinessLevel = document.getElementById('happiness-level');
+            happinessLevel.style.width = character.happiness + '%';
+            
+            // Update indicator dots
+            const dots = document.querySelectorAll('.swipe-dot');
+            dots.forEach((dot, i) => {
+                if (i === index) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+        }
+        
+        // Switch characters
+        function switchCharacter(index) {
+            if (index < 0 || index >= characterGroups.length || index === currentCharIndex) {
+                return;
+            }
+            
+            // Hide current character
+            characterGroups[currentCharIndex].visible = false;
+            
+            // Show new character
+            characterGroups[index].visible = true;
+            currentCharIndex = index;
+            
+            // Update UI
+            updateUI(currentCharIndex);
+            
+            // Update graphs
+            updateCharacterGraphs(currentCharIndex);
+            
+            // Hide tips and graphs when switching characters
+            hideTipsBubble();
+            hideGraphPanel();
+        }
+        
+        // Setup swipe detection
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        function checkSwipeDirection() {
+            if (touchEndX < touchStartX - 50) {
+                // Swipe left - next character
+                switchCharacter(Math.min(currentCharIndex + 1, characterGroups.length - 1));
+            }
+            if (touchEndX > touchStartX + 50) {
+                // Swipe right - previous character
+                switchCharacter(Math.max(currentCharIndex - 1, 0));
+            }
+        }
+        
+        document.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+        
+        document.addEventListener('touchend', e => {
+            touchEndX = e.changedTouches[0].screenX;
+            checkSwipeDirection();
+        });
+        
+        // Arrow button controls
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            switchCharacter(currentCharIndex - 1);
+        });
+        
+        document.getElementById('next-btn').addEventListener('click', () => {
+            switchCharacter(currentCharIndex + 1);
+        });
+        
+        // Rotation controls
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let targetRotation = { x: 0, y: 0 };
+
+        document.addEventListener('mousedown', (event) => {
+            isDragging = true;
+            previousMousePosition = {
+                x: event.clientX,
+                y: event.clientY
+            };
+        });
+
+        document.addEventListener('mousemove', (event) => {
+            if (isDragging) {
+                const deltaMove = {
+                    x: event.clientX - previousMousePosition.x,
+                    y: event.clientY - previousMousePosition.y
+                };
+                
+                const rotationSpeed = 0.01;
+                targetRotation.y += deltaMove.x * rotationSpeed;
+                targetRotation.x += deltaMove.y * rotationSpeed;
+                targetRotation.x = Math.max(Math.min(targetRotation.x, 0.5), -0.5);
+                
+                previousMousePosition = {
+                    x: event.clientX,
+                    y: event.clientY
+                };
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        
+        document.addEventListener('mouseleave', () => {
+            isDragging = false;
+        });
+
+        // Touch events for mobile rotation
+        document.addEventListener('touchstart', (event) => {
+            if (event.touches.length === 1) {
+                isDragging = true;
+                previousMousePosition = {
+                    x: event.touches[0].clientX,
+                    y: event.touches[0].clientY
+                };
+                // Prevent default to avoid scrolling when rotating
+                event.preventDefault();
+            }
+        });
+
+        document.addEventListener('touchmove', (event) => {
+            if (isDragging && event.touches.length === 1) {
+                const deltaMove = {
+                    x: event.touches[0].clientX - previousMousePosition.x,
+                    y: event.touches[0].clientY - previousMousePosition.y
+                };
+                
+                // Adjust rotation speed for better control
+                const rotationSpeed = 0.01;
+                targetRotation.y += deltaMove.x * rotationSpeed;
+                targetRotation.x += deltaMove.y * rotationSpeed;
+                
+                // Limit vertical rotation to avoid flipping
+                targetRotation.x = Math.max(Math.min(targetRotation.x, 0.5), -0.5);
+                
+                previousMousePosition = {
+                    x: event.touches[0].clientX,
+                    y: event.touches[0].clientY
+                };
+                
+                // Always prevent default to avoid scrolling interference
+                event.preventDefault();
+            }
+        });
+
+        document.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+        
+        document.addEventListener('touchcancel', () => {
+            isDragging = false;
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Animation variables
+        let time = 0;
+        let rotation = { x: 0, y: 0 };
+        
+        // Tips functionality
+        const lightbulb = document.getElementById('lightbulb');
+        const tipsBubble = document.getElementById('tips-bubble');
+        const tipTitle = document.getElementById('tip-title');
+        const tipContent = document.getElementById('tip-content');
+        
+        let currentTipIndex = 0;
+        let isTipVisible = false;
+        
+        // Show tip when clicking the lightbulb
+        lightbulb.addEventListener('click', () => {
+            if (isTipVisible) {
+                // If already visible, show next tip
+                currentTipIndex = (currentTipIndex + 1) % characters[currentCharIndex].careTips.length;
+                updateTipContent();
+            } else {
+                // If not visible, show tip
+                showTipsBubble();
+            }
+        });
+        
+        function showTipsBubble() {
+            updateTipContent();
+            tipsBubble.classList.add('active');
+            lightbulb.querySelector('.lightbulb').classList.add('active');
+            isTipVisible = true;
+        }
+        
+        function hideTipsBubble() {
+            tipsBubble.classList.remove('active');
+            lightbulb.querySelector('.lightbulb').classList.remove('active');
+            isTipVisible = false;
+        }
+        
+        function updateTipContent() {
+            const tips = characters[currentCharIndex].careTips;
+            const currentTip = tips[currentTipIndex];
+            
+            tipTitle.textContent = currentTip.title;
+            tipContent.textContent = currentTip.content;
+        }
+        
+        // Graph panel functionality
+        const graphIcon = document.getElementById('graph-icon');
+        const graphPanel = document.getElementById('graph-panel');
+        const graphClose = document.getElementById('graph-close');
+        
+        let isGraphVisible = false;
+        
+        // Toggle graph panel
+        graphIcon.addEventListener('click', () => {
+            if (isGraphVisible) {
+                hideGraphPanel();
+            } else {
+                showGraphPanel();
+            }
+        });
+        
+        // Close button
+        graphClose.addEventListener('click', hideGraphPanel);
+        
+        function showGraphPanel() {
+            graphPanel.classList.add('visible');
+            isGraphVisible = true;
+        }
+        
+        function hideGraphPanel() {
+            graphPanel.classList.remove('visible');
+            isGraphVisible = false;
+        }
+        
+        // Graph tab functionality
+        const tabs = document.querySelectorAll('.graph-tab');
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                tabs.forEach(t => t.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                
+                // Hide all tab content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Show corresponding tab content
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+            });
+        });
+        
+        // Create sample data for graphs
+        function generateSampleData() {
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            
+            // Generate 7 days of data for each character
+            return [
+                {
+                    // Cactus data
+                    moisture: {
+                        labels: days,
+                        datasets: [{
+                            label: 'Soil Moisture (%)',
+                            data: [65, 60, 55, 50, 45, 40, 65], // Last point shows watering
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 2,
+                            tension: 0.3
+                        }]
+                    },
+                    light: {
+                        labels: days,
+                        datasets: [{
+                            label: 'Light Exposure (lux)',
+                            data: [7000, 7500, 8000, 7800, 7200, 6800, 7300],
+                            backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                            borderColor: 'rgba(255, 206, 86, 1)',
+                            borderWidth: 2,
+                            tension: 0.3
+                        }]
+                    },
+                    combined: {
+                        labels: days,
+                        datasets: [
+                            {
+                                label: 'Soil Moisture (%)',
+                                data: [65, 60, 55, 50, 45, 40, 65],
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                borderWidth: 2,
+                                tension: 0.3,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Light Exposure (lux)',
+                                data: [7000, 7500, 8000, 7800, 7200, 6800, 7300],
+                                backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                                borderColor: 'rgba(255, 206, 86, 1)',
+                                borderWidth: 2,
+                                tension: 0.3,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    }
+                },
+                {
+                    // Jasmin data
+                    moisture: {
+                        labels: days,
+                        datasets: [{
+                            label: 'Soil Moisture (%)',
+                            data: [78, 72, 65, 78, 73, 68, 78], // Multiple waterings
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 2,
+                            tension: 0.3
+                        }]
+                    },
+                    light: {
+                        labels: days,
+                        datasets: [{
+                            label: 'Light Exposure (lux)',
+                            data: [5200, 5500, 5800, 5300, 5100, 5400, 5600],
+                            backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                            borderColor: 'rgba(255, 206, 86, 1)',
+                            borderWidth: 2,
+                            tension: 0.3
+                        }]
+                    },
+                    combined: {
+                        labels: days,
+                        datasets: [
+                            {
+                                label: 'Soil Moisture (%)',
+                                data: [78, 72, 65, 78, 73, 68, 78],
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                borderWidth: 2,
+                                tension: 0.3,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Light Exposure (lux)',
+                                data: [5200, 5500, 5800, 5300, 5100, 5400, 5600],
+                                backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                                borderColor: 'rgba(255, 206, 86, 1)',
+                                borderWidth: 2,
+                                tension: 0.3,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    }
+                }
+            ];
+        }
+        
+        // Chart instances
+        let moistureChart, lightChart, combinedChart;
+        const sampleData = generateSampleData();
+        
+        // Initialize charts
+        function initCharts() {
+            // Moisture chart
+            const moistureCtx = document.getElementById('moisture-chart').getContext('2d');
+            moistureChart = new Chart(moistureCtx, {
+                type: 'line',
+                data: sampleData[0].moisture,
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: 30,
+                            max: 100
+                        }
+                    },
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            
+            // Light chart
+            const lightCtx = document.getElementById('light-chart').getContext('2d');
+            lightChart = new Chart(lightCtx, {
+                type: 'line',
+                data: sampleData[0].light,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            
+            // Combined chart
+            const combinedCtx = document.getElementById('combined-chart').getContext('2d');
+            combinedChart = new Chart(combinedCtx, {
+                type: 'line',
+                data: sampleData[0].combined,
+                options: {
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            min: 30,
+                            max: 100
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            min: 4000,
+                            max: 9000,
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    },
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+        
+        // Update charts based on character
+        function updateCharacterGraphs(characterIndex) {
+            const data = sampleData[characterIndex];
+            
+            // Update moisture chart
+            moistureChart.data = data.moisture;
+            moistureChart.update();
+            
+            // Update light chart
+            lightChart.data = data.light;
+            lightChart.update();
+            
+            // Combined chart
+            combinedChart.data = data.combined;
+            combinedChart.update();
+        }
+        
+        // Generate calendar for watering schedule
+        function generateCalendar() {
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+            
+            // Update month header
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            document.getElementById('month-header').textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            
+            // Clear existing calendar
+            const calendarBody = document.getElementById('calendar-body');
+            calendarBody.innerHTML = '';
+            
+            // Create calendar cells
+            let date = 1;
+            for (let i = 0; i < 6; i++) {
+                // Create row
+                const row = document.createElement('tr');
+                
+                // Create cells
+                for (let j = 0; j < 7; j++) {
+                    const cell = document.createElement('td');
+                    
+                    if (i === 0 && j < firstDayOfMonth) {
+                        // Empty cells before first day of month
+                        cell.textContent = '';
+                    } else if (date > daysInMonth) {
+                        // Empty cells after last day of month
+                        cell.textContent = '';
+                    } else {
+                        // Create day cell
+                        const daySpan = document.createElement('span');
+                        daySpan.className = 'calendar-day';
+                        daySpan.textContent = date;
+                        
+                        // Mark today
+                        if (date === now.getDate()) {
+                            daySpan.classList.add('today');
+                        }
+                        
+                        // Mark watering days
+                        if ((currentCharIndex === 0 && (date % 14 === 3 || date % 14 === 17)) || 
+                            (currentCharIndex === 1 && (date % 4 === 1 || date % 4 === 3))) {
+                            daySpan.classList.add('watering-day');
+                        }
+                        
+                        cell.appendChild(daySpan);
+                        date++;
+                    }
+                    
+                    row.appendChild(cell);
+                }
+                
+                calendarBody.appendChild(row);
+                
+                // Stop if we've run out of days
+                if (date > daysInMonth) {
+                    break;
+                }
+            }
+        }
+        
+        // Setup opening the watering panel when clicking the metrics panel
+        document.getElementById('metrics-panel').addEventListener('click', () => {
+            // Update humidity level
+            document.getElementById('humidity-level').style.width = characters[currentCharIndex].happiness + '%';
+            document.getElementById('humidity-status').textContent = `${characters[currentCharIndex].water} (${characters[currentCharIndex].happiness}%)`;
+            
+            // Generate calendar
+            generateCalendar();
+            
+            // Show watering schedule
+            document.getElementById('watering-schedule').classList.add('visible');
+        });
+        
+        // Close watering schedule
+        document.getElementById('close-schedule').addEventListener('click', () => {
+            document.getElementById('watering-schedule').classList.remove('visible');
+        });
+        
+        // Click-to-talk functionality for plants
+        function setupPlantClickInteraction() {
+            // Create a raycaster for detecting clicks on 3D objects
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            
+            // Get speech bubble element
+            const speechBubble = document.getElementById('speech-bubble');
+            
+            // Track if speech bubble is currently showing
+            let isSpeechActive = false;
+            let speechTimeout;
+            
+            // Handle click on canvas
+            renderer.domElement.addEventListener('click', function(event) {
+                // Calculate mouse position in normalized device coordinates
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Update the raycaster with the camera and mouse position
+                raycaster.setFromCamera(mouse, camera);
+                
+                // Find intersected objects - only check current visible character
+                const currentCharacter = characterGroups[currentCharIndex];
+                const intersects = raycaster.intersectObject(currentCharacter, true);
+                
+                // If there's an intersection, make the character talk
+                if (intersects.length > 0) {
+                    makeCharacterTalk(currentCharIndex);
+                }
+            });
+            
+            function makeCharacterTalk(characterIndex) {
+                // Clear any existing timeout to prevent issues
+                if (speechTimeout) {
+                    clearTimeout(speechTimeout);
+                }
+                
+                // Get the character's dialogue options
+                const character = characters[characterIndex];
+                const dialogue = character.dialogue;
+                
+                // Create an array with all dialogue types
+                const allDialogueOptions = [
+                    ...dialogue.greetings,
+                    ...dialogue.quickResponses,
+                    ...dialogue.personalityLines,
+                    ...dialogue.tickleResponses,
+                    ...dialogue.additionalLines
+                ];
+                
+                // Choose a random line
+                const randomLine = allDialogueOptions[Math.floor(Math.random() * allDialogueOptions.length)];
+                
+                // Show speech bubble with the selected line
+                speechBubble.textContent = randomLine;
+                speechBubble.classList.add('active');
+                isSpeechActive = true;
+                
+                // Make speech bubble disappear after 3 seconds
+                speechTimeout = setTimeout(() => {
+                    speechBubble.classList.remove('active');
+                    isSpeechActive = false;
+                }, 3000);
+            }
+        }
+        
+        // Animation loop - optimized for performance
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Increment time
+            time += 0.01;
+            
+            // Smooth rotation with easing
+            rotation.x += (targetRotation.x - rotation.x) * 0.1;
+            rotation.y += (targetRotation.y - rotation.y) * 0.1;
+            
+            // Apply rotation to current character
+            if (characterGroups[currentCharIndex]) {
+                characterGroups[currentCharIndex].rotation.x = rotation.x;
+                characterGroups[currentCharIndex].rotation.y = rotation.y; // Manual rotation only
+                
+                // Simple breathing animation
+                const breathScale = 1 + Math.sin(time * 0.5) * 0.01;
+                characterGroups[currentCharIndex].scale.y = breathScale * (currentCharIndex === 0 ? 0.8 : 0.9);
+            }
+            
+            // Render the scene
+            renderer.render(scene, camera);
+        }
+        
+        // Initialize characters
+        initCharacters();
+        
+        // Initialize charts
+        initCharts();
+        
+        // Setup click-to-talk functionality
+        setupPlantClickInteraction();
+        
+        // Update UI for first character
+        updateUI(currentCharIndex);
+        
+        // Start animation loop
+        animate();
+        
+        // Show welcome speech bubble
+        const speechBubble = document.getElementById('speech-bubble');
+        speechBubble.textContent = characters[currentCharIndex].dialogue.greetings[0];
+        speechBubble.classList.add('active');
+        
+        // Hide speech bubble after a few seconds
+        setTimeout(() => {
+            speechBubble.classList.remove('active');
+        }, 3000);
+    </script>
+</body>
+</html>
